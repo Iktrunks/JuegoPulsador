@@ -1,0 +1,310 @@
+```html
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>El Pulsador Rojo - Skins a 500</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+
+        :root {
+            --bg-color: #0f172a;
+            --btn-color: #dc2626;
+            --btn-border: #991b1b;
+            --btn-shadow: #7f1d1d;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: white;
+            overflow-x: hidden;
+            transition: background 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+            touch-action: manipulation;
+        }
+
+        .rainbow-btn {
+            background: linear-gradient(45deg, #ff0000, #ff7300, #fffb00, #48ff00, #00ffd5, #002bff, #7a00ff, #ff00c8, #ff0000);
+            background-size: 400%;
+            animation: rainbow 10s linear infinite;
+            border-color: rgba(255,255,255,0.7) !important;
+        }
+
+        @keyframes rainbow {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .push-button {
+            position: relative;
+            width: 180px;
+            height: 180px;
+            background: var(--btn-color);
+            border-radius: 50%;
+            border: 8px solid var(--btn-border);
+            box-shadow: 0 10px 0 var(--btn-shadow), 0 20px 40px rgba(0,0,0,0.5);
+            transition: transform 0.05s ease, background 0.3s ease;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .push-button:active {
+            transform: translateY(8px) scale(0.98);
+            box-shadow: 0 2px 0 var(--btn-shadow), 0 5px 15px rgba(0,0,0,0.4);
+        }
+
+        .shop-row {
+            background: rgba(30, 41, 59, 0.5);
+            backdrop-filter: blur(10px);
+            scrollbar-width: none;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        
+        .shop-row::-webkit-scrollbar { display: none; }
+
+        .item-locked {
+            filter: grayscale(1) brightness(0.2);
+            cursor: not-allowed;
+            opacity: 0.4;
+        }
+
+        #loadingOverlay {
+            position: fixed;
+            inset: 0;
+            background: #0f172a;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.5s ease;
+        }
+
+        .auto-pulse {
+            animation: auto-glow 1s ease-in-out;
+        }
+
+        @keyframes auto-glow {
+            0% { color: white; }
+            50% { color: #4ade80; transform: scale(1.05); }
+            100% { color: white; }
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center min-h-screen p-4 pb-20">
+
+    <!-- Pantalla de Carga -->
+    <div id="loadingOverlay">
+        <div class="w-12 h-12 border-4 border-white/10 border-t-red-600 rounded-full animate-spin mb-4"></div>
+        <p class="text-[10px] font-black uppercase tracking-[0.3em]">Restaurando progreso...</p>
+    </div>
+
+    <!-- HUD de Clics -->
+    <div class="text-center mt-6 mb-8">
+        <div id="timer" class="text-gray-500 text-[10px] font-mono mb-1 tracking-widest uppercase">Activo: 00:00</div>
+        <div id="counter" class="text-8xl font-black text-white leading-none">0</div>
+        <div class="flex flex-col items-center gap-2 mt-3">
+            <div class="flex gap-2">
+                <span id="multiplierTag" class="text-[10px] font-bold text-yellow-400 uppercase tracking-widest bg-yellow-500/10 px-4 py-1.5 rounded-full border border-yellow-500/20">Multiplicador: x1</span>
+                <span id="autoTag" class="text-[9px] font-bold text-green-400 uppercase tracking-widest bg-green-500/10 px-3 py-1 rounded-full border border-green-500/20 hidden">Auto: +0/5s</span>
+            </div>
+            <div id="saveStatus" class="text-[8px] text-white/30 uppercase tracking-widest mt-1">Sincronizado</div>
+        </div>
+    </div>
+
+    <!-- Zona de Pulsación -->
+    <div class="relative w-full flex items-center justify-center py-8 mb-8">
+        <button id="mainButton" class="push-button">
+            <span id="buttonLabel" class="font-black text-xl drop-shadow-lg uppercase tracking-widest">Pulsar</span>
+        </button>
+    </div>
+
+    <!-- Contenido Scrollable -->
+    <div class="w-full max-w-xl space-y-8">
+        
+        <!-- SECCIÓN: ANIMALES Y PERSONAJES -->
+        <div class="space-y-3">
+            <div class="flex items-center gap-3 px-2">
+                <span class="text-xs font-black text-blue-400 uppercase tracking-[0.2em]">Skins de Personajes (500 Clics)</span>
+                <div class="h-px flex-1 bg-blue-900/20"></div>
+            </div>
+            <div class="shop-row flex gap-4 p-4 rounded-3xl overflow-x-auto">
+                <div data-cost="500" onclick="applySkin('🐱', '#f97316', '#c2410c', '#9a3412', 500)" class="item-locked flex flex-col items-center gap-1 shrink-0 cursor-pointer">
+                    <div class="w-12 h-12 rounded-full bg-orange-500 flex items-center justify-center text-xl shadow-lg border-2 border-orange-800">🐱</div>
+                    <span class="text-[9px] font-bold">500</span>
+                </div>
+                <div data-cost="500" onclick="applySkin('🐶', '#a16207', '#713f12', '#451a03', 500)" class="item-locked flex flex-col items-center gap-1 shrink-0 cursor-pointer">
+                    <div class="w-12 h-12 rounded-full bg-yellow-700 flex items-center justify-center text-xl shadow-lg border-2 border-yellow-900">🐶</div>
+                    <span class="text-[9px] font-bold">500</span>
+                </div>
+                <div data-cost="500" onclick="applySkin('🐍', '#16a34a', '#14532d', '#064e3b', 500)" class="item-locked flex flex-col items-center gap-1 shrink-0 cursor-pointer">
+                    <div class="w-12 h-12 rounded-full bg-green-600 flex items-center justify-center text-xl shadow-lg border-2 border-green-800">🐍</div>
+                    <span class="text-[9px] font-bold">500</span>
+                </div>
+                <div data-cost="500" onclick="applySkin('🐲', '#991b1b', '#7f1d1d', '#450a0a', 500)" class="item-locked flex flex-col items-center gap-1 shrink-0 cursor-pointer">
+                    <div class="w-12 h-12 rounded-full bg-red-800 flex items-center justify-center text-xl shadow-lg border-2 border-red-950">🐲</div>
+                    <span class="text-[9px] font-bold">500</span>
+                </div>
+                <div data-cost="500" onclick="applySkin('🥷', '#18181b', '#09090b', '#000000', 500)" class="item-locked flex flex-col items-center gap-1 shrink-0 cursor-pointer">
+                    <div class="w-12 h-12 rounded-full bg-zinc-900 flex items-center justify-center text-xl shadow-lg border-2 border-black">🥷</div>
+                    <span class="text-[9px] font-bold">500</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCIÓN: AUTO-CLICS -->
+        <div class="space-y-3">
+            <div class="flex items-center gap-3 px-2">
+                <span class="text-xs font-black text-green-500 uppercase tracking-[0.2em]">Automatización</span>
+                <div class="h-px flex-1 bg-green-900/20"></div>
+            </div>
+            <div class="shop-row flex gap-4 p-4 rounded-3xl overflow-x-auto">
+                <div data-cost="200" onclick="buyAuto(200, 1)" class="item-locked flex flex-col items-center gap-1 shrink-0 cursor-pointer">
+                    <div class="w-12 h-12 rounded-full bg-green-600 flex items-center justify-center shadow-lg border-2 border-green-800"><span class="text-[10px] font-black">+1</span></div>
+                    <span class="text-[9px] font-bold">200</span>
+                </div>
+                <div data-cost="300" onclick="buyAuto(300, 2)" class="item-locked flex flex-col items-center gap-1 shrink-0 cursor-pointer">
+                    <div class="w-12 h-12 rounded-full bg-green-600 flex items-center justify-center shadow-lg border-2 border-green-800"><span class="text-[10px] font-black">+2</span></div>
+                    <span class="text-[9px] font-bold">300</span>
+                </div>
+                <div data-cost="750" onclick="buyAuto(750, 5)" class="item-locked flex flex-col items-center gap-1 shrink-0 cursor-pointer">
+                    <div class="w-12 h-12 rounded-full bg-green-600 flex items-center justify-center shadow-lg border-2 border-green-800"><span class="text-[10px] font-black">+5</span></div>
+                    <span class="text-[9px] font-bold">750</span>
+                </div>
+                <div data-cost="1500" onclick="buyAuto(1500, 10)" class="item-locked flex flex-col items-center gap-1 shrink-0 cursor-pointer">
+                    <div class="w-12 h-12 rounded-full bg-green-600 flex items-center justify-center shadow-lg border-2 border-green-800"><span class="text-[10px] font-black">+10</span></div>
+                    <span class="text-[9px] font-bold">1.5k</span>
+                </div>
+                <div data-cost="3000" onclick="buyAuto(3000, 20)" class="item-locked flex flex-col items-center gap-1 shrink-0 cursor-pointer">
+                    <div class="w-12 h-12 rounded-full bg-green-600 flex items-center justify-center shadow-lg border-2 border-green-800"><span class="text-[10px] font-black">+20</span></div>
+                    <span class="text-[9px] font-bold">3k</span>
+                </div>
+                <div data-cost="5000" onclick="buyAuto(5000, 35)" class="item-locked flex flex-col items-center gap-1 shrink-0 cursor-pointer">
+                    <div class="w-12 h-12 rounded-full bg-green-600 flex items-center justify-center shadow-lg border-2 border-green-800"><span class="text-[10px] font-black">+35</span></div>
+                    <span class="text-[9px] font-bold">5k</span>
+                </div>
+                <div data-cost="8000" onclick="buyAuto(8000, 50)" class="item-locked flex flex-col items-center gap-1 shrink-0 cursor-pointer">
+                    <div class="w-12 h-12 rounded-full bg-green-600 flex items-center justify-center shadow-lg border-2 border-green-800"><span class="text-[10px] font-black">+50</span></div>
+                    <span class="text-[9px] font-bold">8k</span>
+                </div>
+                <div data-cost="12000" onclick="buyAuto(12000, 65)" class="item-locked flex flex-col items-center gap-1 shrink-0 cursor-pointer">
+                    <div class="w-12 h-12 rounded-full bg-green-600 flex items-center justify-center shadow-lg border-2 border-green-800"><span class="text-[10px] font-black">+65</span></div>
+                    <span class="text-[9px] font-bold">12k</span>
+                </div>
+                <div data-cost="18000" onclick="buyAuto(18000, 80)" class="item-locked flex flex-col items-center gap-1 shrink-0 cursor-pointer">
+                    <div class="w-12 h-12 rounded-full bg-green-600 flex items-center justify-center shadow-lg border-2 border-green-800"><span class="text-[10px] font-black">+80</span></div>
+                    <span class="text-[9px] font-bold">18k</span>
+                </div>
+                <div data-cost="25000" onclick="buyAuto(25000, 100)" class="item-locked flex flex-col items-center gap-1 shrink-0 cursor-pointer">
+                    <div class="w-12 h-12 rounded-full bg-green-600 flex items-center justify-center shadow-lg border-2 border-green-800"><span class="text-[10px] font-black">+100</span></div>
+                    <span class="text-[9px] font-bold">25k</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCIÓN: BOTONES -->
+        <div class="space-y-3">
+            <div class="flex items-center gap-3 px-2">
+                <span class="text-xs font-black text-gray-500 uppercase tracking-[0.2em]">Colores del Botón</span>
+                <div class="h-px flex-1 bg-white/10"></div>
+            </div>
+            <div class="shop-row flex gap-4 p-4 rounded-3xl overflow-x-auto">
+                <div onclick="applySkin('Pulsar', '#dc2626', '#991b1b', '#7f1d1d', 0)" class="flex flex-col items-center gap-1 shrink-0 cursor-pointer">
+                    <div class="w-12 h-12 rounded-full border-2 border-dashed border-white/20 flex items-center justify-center text-xs font-bold text-white/30">∅</div>
+                    <span class="text-[9px] font-bold text-white/40 uppercase">Reset</span>
+                </div>
+                <div data-cost="50" onclick="applySkin('Pulsar', '#3b82f6', '#1e40af', '#1e3a8a', 50)" class="item-locked flex flex-col items-center gap-1 shrink-0 cursor-pointer">
+                    <div class="w-12 h-12 rounded-full bg-blue-500 border-2 border-blue-800"></div><span class="text-[9px] font-bold">50</span>
+                </div>
+                <div data-cost="150" onclick="applySkin('Pulsar', '#10b981', '#065f46', '#064e3b', 150)" class="item-locked flex flex-col items-center gap-1 shrink-0 cursor-pointer">
+                    <div class="w-12 h-12 rounded-full bg-emerald-500 border-2 border-emerald-800"></div><span class="text-[9px] font-bold">150</span>
+                </div>
+                <div data-cost="300" onclick="applySkin('Pulsar', '#f59e0b', '#b45309', '#92400e', 300)" class="item-locked flex flex-col items-center gap-1 shrink-0 cursor-pointer">
+                    <div class="w-12 h-12 rounded-full bg-amber-500 border-2 border-amber-800"></div><span class="text-[9px] font-bold">300</span>
+                </div>
+                <div data-cost="500" onclick="applySkin('Pulsar', '#a855f7', '#6b21a8', '#581c87', 500)" class="item-locked flex flex-col items-center gap-1 shrink-0 cursor-pointer">
+                    <div class="w-12 h-12 rounded-full bg-purple-500 border-2 border-purple-800"></div><span class="text-[9px] font-bold">500</span>
+                </div>
+                <div data-cost="800" onclick="applySkin('Pulsar', '#ec4899', '#9d174d', '#831843', 800)" class="item-locked flex flex-col items-center gap-1 shrink-0 cursor-pointer">
+                    <div class="w-12 h-12 rounded-full bg-pink-500 border-2 border-pink-800"></div><span class="text-[9px] font-bold">800</span>
+                </div>
+                <div data-cost="1200" onclick="applySkin('Pulsar', '#06b6d4', '#0891b2', '#155e75', 1200)" class="item-locked flex flex-col items-center gap-1 shrink-0 cursor-pointer">
+                    <div class="w-12 h-12 rounded-full bg-cyan-500 border-2 border-cyan-800"></div><span class="text-[9px] font-bold">1.2k</span>
+                </div>
+                <div data-cost="2000" onclick="applySkin('Pulsar', '#84cc16', '#4d7c0f', '#365314', 2000)" class="item-locked flex flex-col items-center gap-1 shrink-0 cursor-pointer">
+                    <div class="w-12 h-12 rounded-full bg-lime-500 border-2 border-lime-800"></div><span class="text-[9px] font-bold">2k</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCIÓN: FONDOS -->
+        <div class="space-y-3">
+            <div class="flex items-center gap-3 px-2">
+                <span class="text-xs font-black text-gray-500 uppercase tracking-[0.2em]">Fondo del Entorno</span>
+                <div class="h-px flex-1 bg-white/10"></div>
+            </div>
+            <div class="shop-row flex gap-4 p-4 rounded-3xl overflow-x-auto">
+                <div onclick="applyBg('#0f172a', 0)" class="flex flex-col items-center gap-1 shrink-0 cursor-pointer">
+                    <div class="w-12 h-12 rounded-2xl border-2 border-dashed border-white/20 flex items-center justify-center text-xs font-bold text-white/30">∅</div>
+                    <span class="text-[9px] font-bold text-white/40 uppercase">Reset</span>
+                </div>
+                <div data-cost="100" onclick="applyBg('#1e1b4b', 100)" class="item-locked flex flex-col items-center gap-1 shrink-0 cursor-pointer">
+                    <div class="w-12 h-12 rounded-2xl bg-indigo-950 border border-white/5"></div><span class="text-[9px] font-bold">100</span>
+                </div>
+                <div data-cost="400" onclick="applyBg('#064e3b', 400)" class="item-locked flex flex-col items-center gap-1 shrink-0 cursor-pointer">
+                    <div class="w-12 h-12 rounded-2xl bg-emerald-950 border border-white/5"></div><span class="text-[9px] font-bold">400</span>
+                </div>
+                <div data-cost="700" onclick="applyBg('#450a0a', 700)" class="item-locked flex flex-col items-center gap-1 shrink-0 cursor-pointer">
+                    <div class="w-12 h-12 rounded-2xl bg-red-950 border border-white/5"></div><span class="text-[9px] font-bold">700</span>
+                </div>
+                <div data-cost="1000" onclick="applyBg('#171717', 1000)" class="item-locked flex flex-col items-center gap-1 shrink-0 cursor-pointer">
+                    <div class="w-12 h-12 rounded-2xl bg-neutral-900 border border-white/5"></div><span class="text-[9px] font-bold">1k</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- SECCIÓN: RENACIMIENTO -->
+        <div class="pt-8 pb-12">
+            <div class="flex items-center gap-3 px-2 mb-4">
+                <span class="text-xs font-black text-yellow-600 uppercase tracking-[0.2em]">Prestigio de Maestría</span>
+                <div class="h-px flex-1 bg-yellow-900/20"></div>
+            </div>
+            <div class="p-6 rounded-[2rem] bg-white/5 border border-white/10 flex flex-col items-center gap-6">
+                <div class="flex justify-around w-full">
+                    <div class="text-center">
+                        <p class="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">Nivel</p>
+                        <p id="rebirthLevel" class="text-3xl font-black text-white">0 / 5</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-[10px] text-gray-500 uppercase font-bold tracking-widest mb-1">Ganancia</p>
+                        <p id="nextMult" class="text-3xl font-black text-yellow-500">x2</p>
+                    </div>
+                </div>
+                <button id="rebirthBtn" onclick="doRebirth()" class="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black py-5 rounded-2xl shadow-xl transition-all transform active:scale-95 disabled:bg-gray-800 disabled:text-gray-600 disabled:shadow-none uppercase tracking-widest">
+                    RENACER (<span id="rebirthCost">1k</span> Clics)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notificaciones -->
+    <div id="toast" class="fixed top-8 left-1/2 -translate-x-1/2 bg-white text-black px-6 py-2.5 rounded-full font-bold shadow-2xl opacity-0 transition-all duration-500 pointer-events-none z-50 text-sm"></div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+   
